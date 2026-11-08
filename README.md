@@ -1,4 +1,5 @@
 # KRITIS Detection Lab
+<img width="1888" height="692" alt="Bildschirmfoto 2026-11-08 um 01 01 12" src="https://github.com/user-attachments/assets/044b6e0f-18e8-4bc6-acb5-e5419571971f" />
 
 A small, fully local lab that simulates a **water treatment plant (OT/ICS)** and shows how a
 SOC / Blue Team can **detect attacks on Modbus/TCP**. Built as a portfolio project for
@@ -8,6 +9,8 @@ critical infrastructure (KRITIS) and NIS2 contexts.
 > target the simulator in this repo. Never run them against systems you do not own.
 
 ## Architecture
+
+
 
 ```
  browser ──▶ dashboard (GUI, :8080) ──Modbus/TCP 502──▶ plc-sim (fake water plant)
