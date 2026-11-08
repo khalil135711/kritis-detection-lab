@@ -1,0 +1,44 @@
+services:
+  plc-sim:
+    build: ./ot-sim
+    container_name: plc-sim
+    networks: [ot-net]
+    cap_add: [NET_ADMIN]
+
+  suricata:
+    image: jasonish/suricata:latest
+    container_name: suricata
+    network_mode: "service:plc-sim"   # sniffs the PLC's interface
+    cap_add: [NET_ADMIN, NET_RAW, SYS_NICE]
+    command: ["-i", "eth0", "-S", "/rules/kritis.rules"]
+    volumes:
+      - ./detections/suricata/kritis.rules:/rules/kritis.rules:ro
+      - ./logs:/var/log/suricata
+    depends_on: [plc-sim]
+
+  dashboard:
+    build: ./dashboard
+    container_name: kritis-dashboard
+    networks: [ot-net, ui-net]
+    ports:
+      - "127.0.0.1:8080:8080"          # GUI: http://localhost:8080
+    environment:
+      - TARGET=plc-sim
+      - EVE_LOG=/logs/eve.json
+    volumes:
+      - ./logs:/logs:ro
+    depends_on: [plc-sim]
+
+  attacker:                            # optional CLI version of the scenarios
+    build: ./attacks
+    networks: [ot-net]
+    profiles: ["attack"]
+    environment:
+      - TARGET=plc-sim
+
+networks:
+  ot-net:
+    driver: bridge
+    internal: true   # the plant and Suricata have no internet access
+  ui-net:
+    driver: bridge   # only the dashboard is reachable from the host

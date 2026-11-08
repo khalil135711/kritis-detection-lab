@@ -1,0 +1,21 @@
+title: Modbus Write From Non-Engineering Host
+id: 7c0f1b6e-2d4a-4b8e-9a51-000000000001
+status: experimental
+description: Suricata alert for a Modbus write command coming from a host that is not the engineering workstation.
+logsource:
+  product: suricata
+  service: eve
+detection:
+  selection:
+    event_type: alert
+    alert.signature_id:
+      - 9000002
+      - 9000003
+  filter_engineering_ws:
+    src_ip: '10.0.0.10'
+  condition: selection and not filter_engineering_ws
+falsepositives:
+  - Maintenance work by the engineering workstation
+level: high
+tags:
+  - attack.t0836

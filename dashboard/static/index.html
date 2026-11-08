@@ -1,0 +1,261 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>KRITIS Detection Lab</title>
+<style>
+  :root {
+    --paper: #e6ecef;
+    --panel: #f6f8f9;
+    --ink: #13242c;
+    --muted: #5a6d76;
+    --line: #c5d0d6;
+    --water: #0e7c86;
+    --water-soft: #9fd3d6;
+    --alarm: #b3261e;
+    --alarm-soft: #f6dcd9;
+    --ok: #2d6a4f;
+    --font: "Avenir Next", "Segoe UI", "Helvetica Neue", Arial, sans-serif;
+    --mono: ui-monospace, "SF Mono", Menlo, Consolas, monospace;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --paper: #0f1a20; --panel: #172730; --ink: #e3ecef; --muted: #8ea2ab;
+      --line: #2b414c; --water: #3fb6c0; --water-soft: #1b5560;
+      --alarm: #ff7b72; --alarm-soft: #3a1d1f; --ok: #6fcf97;
+    }
+  }
+  * { box-sizing: border-box; }
+  body { margin: 0; background: var(--paper); color: var(--ink); font-family: var(--font); line-height: 1.45; }
+  header { padding: 20px clamp(16px, 4vw, 40px) 8px; display: flex; flex-wrap: wrap; align-items: baseline; gap: 4px 20px; }
+  h1 { font-size: 1.35rem; margin: 0; font-weight: 700; letter-spacing: -0.01em; }
+  header p { margin: 0; color: var(--muted); font-size: .92rem; }
+  .conn { margin-left: auto; font-size: .9rem; display: flex; align-items: center; gap: 8px; }
+  .dot { width: 10px; height: 10px; border-radius: 50%; background: var(--muted); }
+  .dot.up { background: var(--ok); } .dot.down { background: var(--alarm); }
+
+  main { display: grid; grid-template-columns: minmax(0, 1.25fr) minmax(0, 1fr); gap: 20px;
+         padding: 12px clamp(16px, 4vw, 40px) 40px; }
+  @media (max-width: 900px) { main { grid-template-columns: 1fr; } }
+  section { background: var(--panel); border: 1px solid var(--line); border-radius: 10px; padding: 18px; }
+  h2 { font-size: 1rem; margin: 0 0 12px; font-weight: 700; }
+  .stack { display: grid; gap: 20px; align-content: start; }
+
+  /* plant */
+  .plant svg { width: 100%; height: auto; display: block; }
+  .plant text { font-family: var(--font); fill: var(--ink); }
+  .plant .small { font-size: 13px; fill: var(--muted); }
+  .plant .val { font-family: var(--mono); font-size: 17px; font-weight: 600; }
+  .pipe { stroke: var(--line); stroke-width: 10; fill: none; stroke-linecap: round; }
+  .shell { fill: none; stroke: var(--ink); stroke-width: 3; }
+  #water { fill: var(--water); transition: y .8s ease, height .8s ease; }
+  .box { fill: var(--panel); stroke: var(--ink); stroke-width: 2; }
+  .box.bad { stroke: var(--alarm); fill: var(--alarm-soft); stroke-width: 3; }
+  #warn { fill: var(--alarm); font-size: 13px; font-weight: 700; }
+  @media (prefers-reduced-motion: reduce) { #water { transition: none; } }
+
+  /* scenarios */
+  .scn { border-top: 1px solid var(--line); padding: 14px 0; display: grid; grid-template-columns: 1fr auto; gap: 4px 12px; }
+  .scn:first-of-type { border-top: 0; padding-top: 0; }
+  .scn h3 { margin: 0; font-size: .98rem; }
+  .scn p { margin: 0; color: var(--muted); font-size: .88rem; grid-column: 1; }
+  .scn .tech { font-family: var(--mono); font-size: .8rem; color: var(--muted); grid-column: 1; }
+  button { font: inherit; font-weight: 600; cursor: pointer; border-radius: 8px; border: 1px solid var(--ink);
+           background: var(--ink); color: var(--paper); padding: 8px 16px; }
+  button.secondary { background: transparent; color: var(--ink); }
+  button:disabled { opacity: .5; cursor: progress; }
+  button:focus-visible { outline: 3px solid var(--water); outline-offset: 2px; }
+  .scn button { grid-column: 2; grid-row: 1 / span 2; align-self: center; }
+  .status { grid-column: 1 / -1; font-size: .88rem; font-weight: 600; margin-top: 4px; color: var(--muted); }
+  .status.ok { color: var(--ok); } .status.bad { color: var(--alarm); }
+  .reset { margin-top: 12px; display: flex; gap: 12px; align-items: center; flex-wrap: wrap; }
+  .reset span { color: var(--muted); font-size: .85rem; }
+
+  /* alerts */
+  .alerts { overflow-x: auto; }
+  table { border-collapse: collapse; width: 100%; font-size: .88rem; }
+  th { text-align: left; font-weight: 600; color: var(--muted); padding: 4px 8px 8px 0; white-space: nowrap; }
+  td { padding: 8px 8px 8px 0; border-top: 1px solid var(--line); vertical-align: top; }
+  td.t { font-family: var(--mono); white-space: nowrap; }
+  td.tech { color: var(--muted); }
+  .empty { color: var(--muted); font-size: .92rem; margin: 0; }
+  .sr { position: absolute; left: -9999px; }
+</style>
+</head>
+<body>
+<header>
+  <h1>KRITIS Detection Lab</h1>
+  <p>Simulated water plant, watched by Suricata</p>
+  <div class="conn" role="status"><span class="dot" id="dot"></span><span id="connText">Connecting to plant</span></div>
+</header>
+
+<main>
+  <section class="plant" aria-labelledby="plantH">
+    <h2 id="plantH">Plant</h2>
+    <svg viewBox="0 0 640 340" role="img" aria-label="Water plant diagram with tank, inlet valve, pump and chlorine dosing">
+      <path class="pipe" d="M30 120 H240"/>
+      <path class="pipe" d="M410 270 H520"/>
+      <path class="pipe" d="M520 130 V160 H410" style="stroke-width:6"/>
+
+      <!-- tank -->
+      <rect id="tankClip" x="240" y="50" width="170" height="240" rx="6" fill="none"/>
+      <clipPath id="clip"><rect x="242" y="52" width="166" height="236" rx="5"/></clipPath>
+      <rect id="water" x="242" y="288" width="166" height="0" clip-path="url(#clip)"/>
+      <rect class="shell" x="240" y="50" width="170" height="240" rx="6"/>
+      <text x="325" y="40" text-anchor="middle" class="small">Tank level</text>
+      <text id="level" x="325" y="176" text-anchor="middle" class="val" style="font-size:26px">-</text>
+
+      <!-- inlet valve -->
+      <g transform="translate(130 120)">
+        <path d="M-18 -16 L18 16 M-18 16 L18 -16" stroke="var(--ink)" stroke-width="3"/>
+        <circle r="22" fill="none" stroke="var(--ink)" stroke-width="3"/>
+      </g>
+      <text x="130" y="80" text-anchor="middle" class="small">Inlet valve</text>
+      <text id="valve" x="130" y="166" text-anchor="middle" class="val">-</text>
+
+      <!-- pump -->
+      <circle cx="470" cy="270" r="26" class="box"/>
+      <path d="M458 258 L486 270 L458 282 Z" fill="var(--ink)"/>
+      <text x="470" y="318" text-anchor="middle" class="small">Outlet pump</text>
+      <text id="pump" x="470" y="236" text-anchor="middle" class="val">-</text>
+
+      <!-- chlorine -->
+      <rect id="clBox" x="480" y="40" width="140" height="90" rx="8" class="box"/>
+      <text x="550" y="64" text-anchor="middle" class="small">Chlorine dosing</text>
+      <text id="cl" x="550" y="96" text-anchor="middle" class="val" style="font-size:24px">-</text>
+      <text id="warn" x="550" y="118" text-anchor="middle"></text>
+    </svg>
+    <p class="small" style="margin:8px 0 0;color:var(--muted);font-size:.85rem">
+      Values are read live from the simulator over Modbus/TCP. Normal chlorine dosing is 20.
+    </p>
+  </section>
+
+  <div class="stack">
+    <section aria-labelledby="scnH">
+      <h2 id="scnH">Attack scenarios</h2>
+      <div id="scenarios"></div>
+      <div class="reset">
+        <button class="secondary" id="restore">Restore normal values</button>
+        <span>Writes 20 to chlorine and 40 to the valve, so it raises a write alert too.</span>
+      </div>
+    </section>
+
+    <section aria-labelledby="alH">
+      <h2 id="alH">Suricata alerts</h2>
+      <div class="alerts" id="alertBox"></div>
+    </section>
+  </div>
+</main>
+
+<script>
+const $ = id => document.getElementById(id);
+let scenarioData = [];
+const running = new Set();
+
+async function api(path, opts) {
+  const r = await fetch(path, opts);
+  return r.json();
+}
+
+function fmtTime(epoch) {
+  return new Date(epoch * 1000).toLocaleTimeString([], {hour12: false});
+}
+
+async function pollState() {
+  try {
+    const s = await api('/api/state');
+    if (!s.ok) throw new Error();
+    $('dot').className = 'dot up';
+    $('connText').textContent = 'Plant online';
+    $('level').textContent = s.level + ' %';
+    $('valve').textContent = s.valve + ' %';
+    $('pump').textContent = s.pump ? 'running' : 'off';
+    $('cl').textContent = s.chlorine;
+    const h = 236 * Math.max(0, Math.min(100, s.level)) / 100;
+    $('water').setAttribute('y', 288 - h);
+    $('water').setAttribute('height', h);
+    const bad = s.chlorine > 40;
+    $('clBox').setAttribute('class', 'box' + (bad ? ' bad' : ''));
+    $('warn').textContent = bad ? 'Outside normal range' : '';
+  } catch (e) {
+    $('dot').className = 'dot down';
+    $('connText').textContent = 'Plant unreachable';
+  }
+}
+
+async function pollAlerts() {
+  try {
+    const d = await api('/api/alerts');
+    const box = $('alertBox');
+    if (!d.alerts.length) {
+      box.innerHTML = '<p class="empty">' + (d.log_found
+        ? 'No alerts yet. Run a scenario to see detections here.'
+        : 'Waiting for Suricata to create logs/eve.json.') + '</p>';
+      return;
+    }
+    box.innerHTML = '<table><thead><tr><th>Time</th><th>Detection</th><th>ATT&amp;CK technique</th><th>Source</th></tr></thead><tbody>' +
+      d.alerts.map(a => `<tr><td class="t">${fmtTime(a.time)}</td><td>${esc(a.signature)}<br><span class="tech">rule ${a.sid}</span></td><td class="tech">${esc(a.technique)}</td><td class="t">${esc(a.src)}</td></tr>`).join('') +
+      '</tbody></table>';
+  } catch (e) {}
+}
+
+function esc(s) { return String(s ?? '').replace(/[&<>"]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c])); }
+
+function renderScenarios(now) {
+  const root = $('scenarios');
+  if (!root.children.length) {
+    root.innerHTML = scenarioData.map(s => `
+      <div class="scn">
+        <h3>${esc(s.title)}</h3>
+        <button data-id="${s.id}">Run</button>
+        <p>${esc(s.description)}</p>
+        <span class="tech">${esc(s.technique)}, expected rule ${s.sid}</span>
+        <div class="status" id="st-${s.id}" aria-live="polite">Not run yet</div>
+      </div>`).join('');
+    root.querySelectorAll('button').forEach(b => b.addEventListener('click', () => runScenario(b.dataset.id, b)));
+  }
+  scenarioData.forEach(s => {
+    const el = $('st-' + s.id);
+    if (!s.last_run) { el.textContent = 'Not run yet'; el.className = 'status'; return; }
+    if (s.detected) { el.textContent = 'Detected by rule ' + s.sid; el.className = 'status ok'; }
+    else if (now - s.last_run < 10) { el.textContent = 'Waiting for the alert'; el.className = 'status'; }
+    else { el.textContent = 'Not detected. Check that Suricata is running.'; el.className = 'status bad'; }
+  });
+}
+
+async function pollScenarios() {
+  try {
+    const d = await api('/api/scenarios');
+    scenarioData = d.scenarios;
+    renderScenarios(d.now);
+  } catch (e) {}
+}
+
+async function runScenario(id, btn) {
+  btn.disabled = true;
+  const label = btn.textContent;
+  btn.textContent = 'Running';
+  try {
+    const r = await api('/api/run/' + id, {method: 'POST'});
+    if (!r.ok) alert('Scenario failed: ' + (r.error || 'unknown error'));
+  } finally {
+    btn.disabled = false; btn.textContent = label;
+    pollScenarios(); pollState();
+  }
+}
+
+$('restore').addEventListener('click', async e => {
+  e.target.disabled = true;
+  await api('/api/run/restore', {method: 'POST'});
+  e.target.disabled = false;
+  pollState();
+});
+
+pollScenarios(); pollState(); pollAlerts();
+setInterval(pollState, 3000);
+setInterval(pollAlerts, 2000);
+setInterval(pollScenarios, 2000);
+</script>
+</body>
+</html>
